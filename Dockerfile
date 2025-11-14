@@ -1,60 +1,50 @@
 #####################################################
-# 1. Base image para todos os apps
+# 1. Base image
 #####################################################
-# Usar a imagem oficial do pnpm é mais fácil
 FROM node:22-alpine AS base
 
-# Instalar pnpm
+# Instalar pnpm@8 (para ser consistente com o seu ci.yml)
 RUN npm install -g pnpm@8
-
 RUN apk add --no-cache libc6-compat curl
+
+#####################################################
+# 2. Dependências de PRODUÇÃO (para a imagem final)
+#####################################################
+FROM base AS prod-deps
 WORKDIR /app
-
-#####################################################
-# 2. Dependências do web (Next.js + Prisma)
-#####################################################
-FROM base AS deps-web
-
 ENV PRISMA_SKIP_POSTINSTALL_GENERATE=true
-
-# Copiar ficheiros de package (agora com pnpm)
 COPY package.json pnpm-lock.yaml ./
 
-# Instalar dependências de produção com pnpm
-RUN pnpm install --prod --frozen-lockfile
+# Instalar APENAS deps de produção e IGNORAR scripts (como o prisma generate)
+RUN pnpm install --prod --frozen-lockfile --ignore-scripts
 
 #####################################################
-# 3. Builder do web
+# 3. Builder do web (precisa de TODAS as dependências)
 #####################################################
 FROM base AS builder-web
-
 WORKDIR /app
 
-# Copiar todos os ficheiros da aplicação web
+# Instalar TODAS as dependências (incluindo dev-deps como 'prisma' e 'typescript')
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile --ignore-scripts
+
+# Agora copiar o resto do código
 COPY . .
 
-# Copiar schema Prisma antes de gerar client
-COPY prisma ./prisma
-
-# Gerar Prisma client (usando pnpm exec)
+# Correr o prisma generate AGORA, que 'prisma' está instalado
 RUN pnpm exec prisma generate
 
-# Copiar node_modules do stage deps
-COPY --from=deps-web /app/node_modules ./node_modules
-
 # Desabilitar telemetry do Next.js
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NEXT_TELEMETRY_DISABLED=1
 
-# Build do Next.js (usando pnpm)
+# Build do Next.js
 RUN pnpm run build
 
 #####################################################
-# 4. Runner do web
+# 4. Runner do web (A imagem final)
 #####################################################
 FROM base AS runner-web
-
 WORKDIR /app
-
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
@@ -64,15 +54,19 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs \
  && adduser --system --uid 1001 nextjs
 
-# Copiar build e assets
+# Copiar APENAS as dependências de PRODUÇÃO (do stage prod-deps)
+COPY --from=prod-deps /app/node_modules ./node_modules
+
+# Copiar os artefactos do BUILD (do stage builder-web)
 COPY --from=builder-web /app/public ./public
 COPY --from=builder-web /app/.next/standalone ./
 COPY --from=builder-web /app/.next/static ./.next/static
+
+# Copiar o cliente prisma gerado e o schema
 COPY --from=builder-web /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder-web /app/prisma ./prisma
 
 RUN chown -R nextjs:nodejs /app
-
 USER nextjs
 
 EXPOSE 3000
