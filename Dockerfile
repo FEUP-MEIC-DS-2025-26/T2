@@ -5,7 +5,7 @@
 FROM node:22-alpine AS base
 
 # Instalar pnpm
-RUN npm install -g pnpm
+RUN npm install -g pnpm@8
 
 RUN apk add --no-cache libc6-compat curl
 WORKDIR /app
