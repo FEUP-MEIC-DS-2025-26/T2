@@ -1,10 +1,13 @@
 #####################################################
 # 1. Base image para todos os apps
 #####################################################
+# Usar a imagem oficial do pnpm é mais fácil
 FROM node:22-alpine AS base
 
-RUN apk add --no-cache libc6-compat curl
+# Instalar pnpm
+RUN npm install -g pnpm
 
+RUN apk add --no-cache libc6-compat curl
 WORKDIR /app
 
 #####################################################
@@ -14,11 +17,11 @@ FROM base AS deps-web
 
 ENV PRISMA_SKIP_POSTINSTALL_GENERATE=true
 
-# Copiar ficheiros de package para cache
-COPY package.json package-lock.json* ./
+# Copiar ficheiros de package (agora com pnpm)
+COPY package.json pnpm-lock.yaml ./
 
-# Instalar dependências de produção
-RUN npm ci --legacy-peer-deps
+# Instalar dependências de produção com pnpm
+RUN pnpm install --prod --frozen-lockfile
 
 #####################################################
 # 3. Builder do web
@@ -33,8 +36,8 @@ COPY . .
 # Copiar schema Prisma antes de gerar client
 COPY prisma ./prisma
 
-# Gerar Prisma client
-RUN npx prisma generate
+# Gerar Prisma client (usando pnpm exec)
+RUN pnpm exec prisma generate
 
 # Copiar node_modules do stage deps
 COPY --from=deps-web /app/node_modules ./node_modules
@@ -42,8 +45,8 @@ COPY --from=deps-web /app/node_modules ./node_modules
 # Desabilitar telemetry do Next.js
 ENV NEXT_TELEMETRY_DISABLED 1
 
-# Build do Next.js
-RUN npm run build
+# Build do Next.js (usando pnpm)
+RUN pnpm run build
 
 #####################################################
 # 4. Runner do web
@@ -78,24 +81,3 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3000/api/health || exit 1
 
 CMD ["node", "server.js"]
-
-#####################################################
-# 5. Micro-frontends (MIPS)
-# Cada MFE pode usar o mesmo template
-#####################################################
-# Base image para MIPS apps
-FROM node:25-alpine3.21 AS base-mfe
-
-# Instalar pnpm
-RUN npm install -g pnpm
-
-WORKDIR /app
-
-# Função para gerar Dockerfile para cada MFE
-# Exemplo: mips_host, mips_product_page, mips_shopping_cart
-# No docker-compose.yml podemos referenciar o contexto + Dockerfile desta forma:
-
-# COPY package.json e pnpm-lock
-# RUN pnpm install --frozen-lockfile
-# COPY restante código
-# ENV HOST=0.0.0.0

@@ -1,0 +1,76 @@
+# Nome do seu pipeline
+name: CI Pipeline (Build, Lint, Test, Security)
+
+# Em que eventos este pipeline deve correr
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    # Máquina virtual onde o pipeline vai correr
+    runs-on: ubuntu-latest
+    
+    steps:
+      # 1. Obter o código do seu repositório
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Configurar o ambiente pnpm e Node.js
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8 # Mude para a sua versão do pnpm, se for diferente
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18' # Mude para a sua versão do Node.js
+          cache: 'pnpm' # Ativa o cache do 'pnpm' (muito mais rápido)
+
+      # 3. Instalar dependências
+      - name: Install dependencies
+        run: pnpm install
+
+      # 4. Correr Linters
+      # (Assume que 'pnpm run lint' está configurado no package.json da raiz)
+      - name: Run Linters
+        run: pnpm run lint
+
+      # 5. Correr Testes (Unitários/Integração)
+      # (Assume que 'pnpm run test' está configurado no package.json da raiz)
+      - name: Run Tests
+        run: pnpm run test
+      
+      # 6. Scan de Vulnerabilidades (Dependências)
+      - name: Run pnpm Audit (Security Scan)
+        run: pnpm audit --prod
+
+      # 7. Testar os builds das Imagens Docker
+      # Constrói cada Dockerfile para garantir que não falham.
+      
+      - name: Build Docker image for mips_host
+        run: |
+          docker build . \
+            -f apps/mips_host/Dockerfile \
+            -t mips-host:latest
+
+      - name: Build Docker image for mips_product_page
+        run: |
+          docker build . \
+            -f apps/mips_product_page/Dockerfile \
+            -t mips-product-page:latest
+
+      - name: Build Docker image for mips_shopping_cart
+        run: |
+          docker build . \
+            -f apps/mips_shopping_cart/Dockerfile \
+            -t mips-shopping-cart:latest
+            
+      - name: Build Docker image for web (root Dockerfile)
+        run: |
+          docker build . \
+            -f Dockerfile \
+            -t mips-web:latest

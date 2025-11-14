@@ -1,0 +1,62 @@
+# Nome do pipeline de Análise de Segurança
+name: "CodeQL Security Analysis"
+
+# Em que eventos este pipeline deve correr
+on:
+  # Correr sempre que houver um push para a branch 'main'
+  push:
+    branches: [ main ]
+  # Correr sempre que um Pull Request for aberto para a branch 'main'
+  pull_request:
+    branches: [ main ]
+  # Permite correr manualmente a partir do separador "Actions"
+  workflow_dispatch:
+  # Correr numa agenda (ex: todos os domingos às 3 da manhã)
+  schedule:
+    - cron: '30 3 * * 0'
+
+jobs:
+  analyze:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    
+    # Permissões necessárias para o CodeQL ler o código e escrever os resultados
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # O seu projeto é JavaScript/TypeScript
+        language: [ 'javascript' ]
+
+    steps:
+      # 1. Obter o código do seu repositório
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Inicializar o scanner do CodeQL
+      # Esta ação configura o CodeQL e prepara-se para analisar o código
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # 'config-file' é opcional, mas útil se quiser personalizar as queries
+          # config-file: ./.github/codeql/codeql-config.yml
+
+      # 3. (Opcional) Passo de Build
+      # Para JavaScript/TypeScript, o CodeQL geralmente funciona bem sem
+      # um passo de 'build' explícito aqui (como 'pnpm run build').
+      # Mas se a análise falhar em encontrar código, descomente o passo abaixo:
+      #
+      # - name: Perform build (if necessary)
+      #   run: pnpm run build # ou o seu script de build
+
+      # 4. Executar a análise do CodeQL
+      # Esta ação recolhe os dados e envia-os ao GitHub
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{matrix.language}}"
