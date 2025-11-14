@@ -5,8 +5,7 @@
   "scripts": {
     "dev": "rsbuild dev --open",
     "build": "rsbuild build",
-    "preview": "rsbuild preview",
-    "test": "echo \"No tests specified\" && exit 0"
+    "preview": "rsbuild preview"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
