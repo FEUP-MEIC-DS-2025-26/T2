@@ -1,52 +1,71 @@
 import React from "react";
+import Box from "@mui/material/Box";
 import "./App.css";
-// Import the actual component you are building and exposing
-import ProductPage from "./components/ProductPage";
 
-// Simple styles for the standalone "harness"
-const harnessStyles: React.CSSProperties = {
-  padding: "1rem",
-  backgroundColor: "#17181aff",
-  border: "1px solid #ccc",
-  borderRadius: "8px",
-};
+// Importar os componentes de layout
+import Navbar from "./components/Navbar";
+import Footer from "./components/Footer";
+// 1. MUDAR A IMPORTAÇÃO DE 'ProductPage' PARA 'ProductDetail'
+import ProductDetail from "./components/ProductDetail";
+import { ProductSpecifications } from "./components/ProductDetail";
 
+// O harness escuro já não é necessário, pois o ProductDetail
+// tem o seu próprio fundo claro (#DAD7CD).
+// Podemos de-comentar isto se quiser manter o "harness"
+// const harnessStyles: React.CSSProperties = {
+//   padding: "1rem",
+//   backgroundColor: "#17181aff",
+//   border: "1px solid #ccc",
+//   borderRadius: "8px",
+//   margin: "1rem",
+// };
+
+// (Os 'types' Product e CartItem podem ser removidos se o ProductDetail
+// não precisar da função onAddToCart, mas vamos mantê-los por agora)
 export interface Product {
-  id: string; // The *product* ID (e.g., "p1")
+  id: string;
   name: string;
   price: number;
 }
-
-// 2. Define the CartItem interface (the new state structure)
 export interface CartItem {
-  instanceId: string; // The *unique instance* ID (e.g., "uuid-123-abc")
+  instanceId: string;
   product: Product;
 }
 
 const App = () => {
-  const [_, setCartItems] = React.useState<CartItem[]>([]);
-
-  // 5. Add to cart callback (unchanged)
+  // A função onAddToCart já não é usada pelo ProductDetail,
+  // mas podemos mantê-la aqui para o futuro.
   const handleAddToCart = (product: Product) => {
-    const newCartItem: CartItem = {
-      instanceId: crypto.randomUUID(),
-      product: product,
-    };
-    setCartItems((prevItems) => [...prevItems, newCartItem]);
+    console.log("Adicionado ao carrinho (local):", product);
   };
 
   return (
-    <div className="content" style={harnessStyles}>
-      <h1>Running 'mips_product_page' in Standalone Mode</h1>
-      <p>
-        This container is the <strong>local App.tsx</strong>. The component
-        below is the one we are actually exporting.
-      </p>
-      <hr style={{ margin: "1.5rem 0" }} />
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: '100vh',
+      }}
+    >
+      <Navbar />
 
-      {/* This is the actual micro-frontend component */}
-      <ProductPage onAddToCart={handleAddToCart} />
-    </div>
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          // 2. MUDAR O FUNDO. O fundo escuro foi removido.
+          // O ProductDetail e o Footer já definem o fundo #DAD7CD.
+          // Vamos usar um fundo neutro para o 'main'
+          bgcolor: '#DAD7CD', // Este é o fundo principal do seu site
+        }}
+      >
+        {/* 3. SUBSTITUIR O ProductPage PELO ProductDetail */}
+        <ProductDetail />
+        <ProductSpecifications />
+      </Box>
+
+      <Footer />
+    </Box>
   );
 };
 

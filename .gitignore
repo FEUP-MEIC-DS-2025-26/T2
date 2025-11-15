@@ -43,4 +43,8 @@ next-env.d.ts
 /app/generated/prisma
 
 /.venv/
-/apps/mips_product_page/node_modules/*
+
+
+apps/mips_product_page/node_modules/*
+
+apps/mips_product_page/dist/
