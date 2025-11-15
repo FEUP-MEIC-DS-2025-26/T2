@@ -394,13 +394,30 @@ export function ProductSpecifications() {
   return (
     <>
       {/* Additional Information Sections */}
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, px: { xs: 2, sm: 3 }, mx: { xs: 1, sm: 2 } }}>
         {product.specifications.map((spec, index) => (
           <Box key={index} sx={{ bgcolor: '#DAD7CD', borderRadius: '16px', p: { xs: 3, sm: 4 } }}>
-            <Typography variant="h4" sx={{ fontSize: { xs: '1.5rem', sm: '2rem' }, fontWeight: 'bold', color: '#344E41', mb: 2 }}>
+            <Typography 
+              variant="h4" 
+              sx={{ 
+                fontSize: { xs: '1.5rem', sm: '2rem' }, 
+                fontWeight: 'bold', 
+                color: 'black', 
+                mb: 1.5
+              }}
+            >
               {spec.title}
             </Typography>
-            <Typography variant="body1" sx={{ color: 'black', fontSize: { xs: '1.18rem', sm: '1.25rem' }, whiteSpace: 'pre-line' }}>
+            <Typography
+              variant="body1"
+              sx={{
+                color: 'black',
+                fontSize: { xs: '1.18rem', sm: '1.25rem' },
+                lineHeight: 1.6,
+                whiteSpace: 'pre-line',
+                pl: 2,
+              }}
+            >
               {spec.description}
             </Typography>
           </Box>
