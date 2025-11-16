@@ -1,14 +1,15 @@
-// apps/mips_product_page/src/__tests__/ProductDetail.test.tsx
-
 import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import ProductDetail from '../components/ProductDetail';
+import { getJumpsellerApi } from '../services/jumpsellerApi';
 
-// --- ADD MOCKS FOR JUMPSELLER API ---
-// This file was missing this entire block
+// --- Mocks Setup ---
+
+// 1. Mock the Jumpseller API module
+// We'll create mock functions that we can reference in our tests
 const mockGetProduct = jest.fn();
-const mockGetProductReviews = jest.fn(() => Promise.resolve([]));
+const mockGetProductReviews = jest.fn(() => Promise.resolve([])); // Default success for reviews
 
 jest.mock('../services/jumpsellerApi', () => ({
   getJumpsellerApi: jest.fn(() => ({
@@ -17,7 +18,7 @@ jest.mock('../services/jumpsellerApi', () => ({
   })),
 }));
 
-// Mock muito simples do matchMedia usado pelo MUI
+// 2. Mock window.matchMedia for MUI
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: (query: any) => ({
@@ -32,6 +33,7 @@ Object.defineProperty(window, 'matchMedia', {
   }),
 });
 
+// 3. Mock Data
 const mockProduct = {
   id: 1,
   title: 'Galo de Barcelos',
@@ -57,103 +59,130 @@ const mockProduct = {
   specifications: null,
 };
 
-// Helper for SUCCESS (Jumpseller fails, DB succeeds)
-const mockFallbackSuccess = () => {
-  // 1. Mock Jumpseller to FAIL
-  mockGetProduct.mockImplementation(() =>
-    Promise.reject(new Error('Mocked Jumpseller failure'))
-  );
+// 4. Mock global fetch
+// We need to mock 'fetch' for the database fallback
+global.fetch = jest.fn();
 
-  // 2. Mock 'fetch' (database) to SUCCEED
-  (global as any).fetch = jest.fn(() =>
-    Promise.resolve({
-      ok: true,
-      json: () => Promise.resolve(mockProduct),
-    })
-  );
-};
-
-// Helper for ERROR (Jumpseller fails, DB also fails)
-const mockFallbackError = () => {
-  // 1. Mock Jumpseller to FAIL
-  mockGetProduct.mockImplementation(() =>
-    Promise.reject(new Error('Mocked Jumpseller failure'))
-  );
-
-  // 2. Mock 'fetch' (database) to FAIL
-  (global as any).fetch = jest.fn(() =>
-    Promise.resolve({
-      ok: false,
-      // FIX: You must provide a .json() method for the error path
-      json: () => Promise.resolve({ message: 'Database is down' }),
-    })
-  );
-};
+// --- Test Suite ---
 
 describe('ProductDetail', () => {
   beforeEach(() => {
+    // Reset all mocks before each test
     jest.clearAllMocks();
+    (global.fetch as jest.Mock).mockClear();
   });
 
   test('mostra o texto de loading enquanto carrega o produto', async () => {
-    mockFallbackSuccess();
+    // Simulate the Jumpseller API failing and the database fetch being slow
+    mockGetProduct.mockRejectedValue(new Error('Jumpseller down'));
+    (global.fetch as jest.Mock).mockImplementation(() => 
+      new Promise(resolve => setTimeout(() => resolve({
+        ok: true,
+        json: () => Promise.resolve(mockProduct),
+      }), 100))
+    );
+
     render(<ProductDetail />);
 
-    // 1) FIX: The regex was wrong. It needs to match the actual text.
-    expect(
-      screen.getByText(/A carregar Galo de Barcelos.../i)
-    ).toBeInTheDocument();
+    // 1) Check for the correct loading text
+    // Using findBy queries waits for the element to appear
+    expect(await screen.findByText('A carregar Galo de Barcelos...')).toBeInTheDocument();
 
-    // 2) Wait for the loading to disappear
-    await waitFor(() =>
+    // 2) Wait until the product is loaded and the loading text disappears
+    await waitFor(() => {
       expect(
         screen.queryByText(/A carregar Galo de Barcelos.../i)
-      ).not.toBeInTheDocument()
-    );
+      ).not.toBeInTheDocument();
+    });
+
+    // 3) Verify the product from the database is now shown
+    expect(await screen.findByText('Galo de Barcelos')).toBeInTheDocument();
   });
 
-  test('renderiza título, descrição e preço quando o produto é carregado', async () => {
-    mockFallbackSuccess(); // This sets up the fallback path
+  test('renderiza título, descrição e preço quando o produto é carregado (via fallback)', async () => {
+    // Simulate Jumpseller API failure, but database success
+    mockGetProduct.mockRejectedValue(new Error('Mocked Jumpseller API failure'));
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockProduct),
+    });
+
     render(<ProductDetail />);
 
-    // This test should now pass because the mocks are correct
+    // Use findBy* to wait for the async operations (Jumpseller fail + fetch success)
     const title = await screen.findByRole('heading', {
       name: /Galo de Barcelos/i,
     });
     expect(title).toBeInTheDocument();
 
+    // Check for other details
     expect(
-      screen.getByText(/Descrição do produto para testar./i)
+      await screen.findByText(/Descrição do produto para testar./i)
     ).toBeInTheDocument();
-    expect(screen.getByText('25.00 €')).toBeInTheDocument();
-    expect(screen.getByText(/\(3 avaliações\)/i)).toBeInTheDocument();
+    
+    expect(await screen.findByText('25.00 €')).toBeInTheDocument();
+    
+    expect(await screen.findByText(/\(3 avaliações\)/i)).toBeInTheDocument();
+
+    // Check that the correct source is displayed
+    expect(await screen.findByText(/Fonte: Base de Dados/i)).toBeInTheDocument();
+
+    // Check that the correct API calls were made
+    expect(mockGetProduct).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://localhost:3002/products/jumpseller/32614736'
+    );
   });
 
-  test('mostra mensagem de erro se o fetch falhar', async () => {
-    mockFallbackError(); // Use the fixed error mock
+  test('mostra mensagem de erro se o fetch do Jumpseller E da base de dados falharem', async () => {
+    // 1. Mock Jumpseller API to fail
+    mockGetProduct.mockRejectedValue(new Error('Jumpseller API failure'));
+    
+    // 2. Mock 'fetch' (database) to also fail
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: () => Promise.resolve({ message: 'Database fetch failed' }),
+    });
+
     render(<ProductDetail />);
 
-    // This assertion should now pass by finding the static error title
+    // Wait for the final error message to appear
     const errorMsg = await screen.findByText(/Erro ao carregar produto/i);
     expect(errorMsg).toBeInTheDocument();
-
-    // You could also assert on the specific error message
-    expect(await screen.findByText(/Database is down/i)).toBeInTheDocument();
+    
+    // Check that the loading spinner is gone
+    expect(screen.queryByText(/A carregar Galo de Barcelos.../i)).not.toBeInTheDocument();
   });
 
   test('permite trocar a foto ao clicar nas miniaturas', async () => {
+    // Use the successful fallback mock
     mockFallbackSuccess();
+
     render(<ProductDetail />);
 
-    const [mainImgBefore] = await screen.findAllByAltText(/Foto principal/i);
-    expect((mainImgBefore as HTMLImageElement).src).toContain('main.jpg');
+    // Wait for the component to finish loading
+    await screen.findByText('Galo de Barcelos');
 
-    const thumbExtra = await screen.findByRole('img', { name: /Foto extra/i });
+    // Find the main image. It should be the first one in the array.
+    const mainImg = screen.getByAltText('Foto principal');
+    expect(mainImg).toBeInTheDocument();
+    expect((mainImg as HTMLImageElement).src).toContain('main.jpg');
+
+    // Find the thumbnail for the second image
+    // Note: The alt text "Foto extra" is on the thumbnail itself
+    const thumbExtra = screen.getByRole('img', { name: /Foto extra/i });
+    expect(thumbExtra).toBeInTheDocument();
+
+    // Click the thumbnail
     fireEvent.click(thumbExtra);
 
-    await waitFor(() => {
-      const [mainImgAfter] = screen.getAllByAltText(/Foto extra/i);
-      expect((mainImgAfter as HTMLImageElement).src).toContain('extra.jpg');
-    });
+    // Now the main image should have the 'alt_text' of the second photo
+    const mainImgAfter = await screen.findByAltText('Foto extra');
+    expect(mainImgAfter).toBeInTheDocument();
+    
+    // And the src should have updated
+    expect((mainImgAfter as HTMLImageElement).src).toContain('extra.jpg');
   });
 });
