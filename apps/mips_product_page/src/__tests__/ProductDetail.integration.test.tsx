@@ -1,9 +1,23 @@
-// apps/mips_product_page/src/__tests__/ProductDetail.test.tsx
-
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import ProductDetail from '../components/ProductDetail';
-import { getJumpsellerApi } from '../services/jumpsellerApi';
+import { getJumpsellerApi } from '../services/jumpsellerApi'; // Import the mock
+
+// --- This is the new, correct way to set up the mock ---
+
+// 1. Define variables for your mock implementations
+const mockGetProduct = jest.fn(() =>
+  Promise.reject(new Error('Mocked Jumpseller API failure'))
+);
+const mockGetProductReviews = jest.fn(() => Promise.resolve([]));
+
+// 2. Tell the mock factory to USE those variables
+jest.mock('../services/jumpsellerApi', () => ({
+  getJumpsellerApi: jest.fn(() => ({
+    getProduct: mockGetProduct, // Use the variable
+    getProductReviews: mockGetProductReviews, // Use the variable
+  })),
+}));
 
 // This is the mock data we expect from our DATABASE
 const mockDbProduct = {
@@ -19,20 +33,12 @@ const mockDbProduct = {
   specifications: [],
 };
 
-// --- Mock the API ---
-// This tells Jest "when 'getJumpsellerApi' is called, return this object"
-jest.mock('../services/jumpsellerApi', () => ({
-  getJumpsellerApi: jest.fn(() => ({
-    getProduct: jest.fn(() => 
-      Promise.reject(new Error('Mocked Jumpseller API failure'))
-    ),
-    getProductReviews: jest.fn(() => Promise.resolve([])),
-  })),
-}));
-
-// --- Mock global 'fetch' for the database fallback ---
-// Use 'jest-fetch-mock' or a similar library. Here's a manual mock:
 beforeEach(() => {
+  // 3. Clear the mocks before each test
+  mockGetProduct.mockClear();
+  mockGetProductReviews.mockClear();
+  (getJumpsellerApi as jest.Mock).mockClear();
+
   global.fetch = jest.fn(() =>
     Promise.resolve({
       ok: true,
