@@ -1,105 +1,72 @@
+// apps/mips_product_page/src/__tests__/ProductDetail.test.tsx
+
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
-import '@testing-library/jest-dom';
+import { render, screen } from '@testing-library/react';
+import ProductDetail from '../components/ProductDetail';
+import { getJumpsellerApi } from '../services/jumpsellerApi';
 
-import ProductDetail, { ProductSpecifications } from '../components/ProductDetail';
-
-const mockProduct = {
-  id: 1,
-  title: 'Galo de Barcelos',
-  storytelling: 'História linda do produto...',
-  description: 'Descrição do produto para testar.',
-  price: 25,
+// This is the mock data we expect from our DATABASE
+const mockDbProduct = {
+  id: 123,
+  title: 'Galo de Barcelos (from DB)', // Use a unique title
+  storytelling: 'Database storytelling...',
+  description: 'Database description...',
+  price: 25.99,
   avg_score: 4.5,
-  reviewCount: 3,
-  mainPhoto: {
-    photo_url: 'https://example.com/main.jpg',
-    alt_text: 'Foto principal',
-  },
-  photos: [
-    {
-      photo_url: 'https://example.com/main.jpg',
-      alt_text: 'Foto principal',
-    },
-    {
-      photo_url: 'https://example.com/extra.jpg',
-      alt_text: 'Foto extra',
-    },
-  ],
-  specifications: [
-    {
-      title: 'Materiais',
-      description: 'Peça em cerâmica tradicional portuguesa.',
-    },
-  ],
+  reviewCount: 10,
+  mainPhoto: null,
+  photos: [],
+  specifications: [],
 };
 
-const createFetchResponse = (data: any): Response =>
-  ({
-    ok: true,
-    json: async () => data,
-  } as unknown as Response);
+// --- Mock the API ---
+// This tells Jest "when 'getJumpsellerApi' is called, return this object"
+jest.mock('../services/jumpsellerApi', () => ({
+  getJumpsellerApi: jest.fn(() => ({
+    getProduct: jest.fn(() => 
+      Promise.reject(new Error('Mocked Jumpseller API failure'))
+    ),
+    getProductReviews: jest.fn(() => Promise.resolve([])),
+  })),
+}));
 
-describe('Integração ProductDetail + ProductSpecifications', () => {
-  beforeEach(() => {
-    (global as any).fetch = jest.fn().mockResolvedValue(createFetchResponse(mockProduct));
-  });
+// --- Mock global 'fetch' for the database fallback ---
+// Use 'jest-fetch-mock' or a similar library. Here's a manual mock:
+beforeEach(() => {
+  global.fetch = jest.fn(() =>
+    Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve(mockDbProduct),
+    })
+  ) as jest.Mock;
+});
 
-  afterEach(() => {
-    jest.resetAllMocks();
-  });
+// --- Your Test ---
+it('should fail to fetch from Jumpseller and fall back to the database', async () => {
+  render(<ProductDetail />);
 
-  test('carrega produto e mostra detalhe + especificações usando a mesma API', async () => {
-    render(
-      <>
-        <ProductDetail />
-        <ProductSpecifications />
-      </>,
-    );
+  // 1. Initially, it shows the loading spinner
+  expect(screen.getByText('A carregar Galo de Barcelos...')).toBeInTheDocument();
 
-    // 1) primeiro aparece o loading do ProductDetail
-    expect(screen.getByText(/A carregar produto/i)).toBeInTheDocument();
-
-    // 2) depois do fetch, o título do produto aparece
-    const title = await screen.findByRole('heading', { name: /Galo de Barcelos/i });
-    expect(title).toBeInTheDocument();
-
-    // 3) descrição e preço renderizados (detail)
-    expect(screen.getByText(/Descrição do produto para testar\./i)).toBeInTheDocument();
-    expect(screen.getByText(/25\.00 €/)).toBeInTheDocument();
-
-    // 4) especificações renderizadas (specs)
-    const specTitle = await screen.findByText(/Materiais/i);
-    expect(specTitle).toBeInTheDocument();
-    expect(
-      screen.getByText(/Peça em cerâmica tradicional portuguesa\./i),
-    ).toBeInTheDocument();
-
-    // 5) fetch foi chamado para ambos os componentes
-    await waitFor(() => {
-      const fetchMock = (global as any).fetch as jest.Mock;
-      expect(fetchMock).toHaveBeenCalled();
-      expect(fetchMock).toHaveBeenCalledWith('http://localhost:4000/products/1');
-      expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2); // Detail + Specs
-    });
-  });
-
-  test('quando a API falha, ProductDetail mostra mensagem de erro', async () => {
-    (global as any).fetch = jest
-      .fn()
-      .mockResolvedValue({ ok: false, json: async () => ({}) } as unknown as Response);
-
-    render(
-      <>
-        <ProductDetail />
-        <ProductSpecifications />
-      </>,
-    );
-
-    const errorMsg = await screen.findByText(/Erro ao carregar produto/i);
-    expect(errorMsg).toBeInTheDocument();
-
-    // ProductSpecifications, em caso de erro, simplesmente não renderiza nada
-    // (o próprio componente devolve null), por isso aqui não esperamos nada específico.
-  });
+  // 2. Wait for the *final* state after all async calls are done.
+  // 'findByText' is async and waits for the element to appear.
+  // This automatically handles the 'act()' warnings.
+  const finalTitle = await screen.findByText('Galo de Barcelos (from DB)');
+  
+  // 3. Assert on the final state
+  expect(finalTitle).toBeInTheDocument();
+  
+  // You can also check that the API was called
+  expect(getJumpsellerApi().getProduct).toHaveBeenCalled();
+  
+  // And that the database fetch was called
+  expect(global.fetch).toHaveBeenCalledWith(
+    'http://localhost:3002/products/jumpseller/32614736'
+  );
+  
+  // Check that the loading spinner is gone
+  expect(screen.queryByText('A carregar Galo de Barcelos...')).not.toBeInTheDocument();
+  
+  // Check the data source badge
+  expect(await screen.findByText(/Fonte: Base de Dados/)).toBeInTheDocument();
 });
