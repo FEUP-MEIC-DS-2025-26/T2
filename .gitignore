@@ -48,3 +48,5 @@ next-env.d.ts
 apps/mips_product_page/node_modules/*
 
 apps/mips_product_page/dist/
+apps/mips_host/node_modules/*
+apps/mips_shopping_cart/node_modules/*

@@ -8,11 +8,12 @@ const port = process.env.PORT || 4000;
 
 app.use(
   cors({
-    origin: 'http://localhost:3001', // front
-  })
+    origin: 'http://localhost:3001', 
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  }),
 );
 
-// se ainda não tiveres:
 app.use(express.json());
 
 // Endpoint para ir buscar UM produto (ex: /products/1)

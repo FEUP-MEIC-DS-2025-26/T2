@@ -1,0 +1,119 @@
+openapi: 3.0.0
+info:
+  title: Product Page API
+  version: 1.0.0
+  description: |
+    API utilizada pelo Product Page para listar produtos, ver detalhes
+    e obter recomendações/bundles.
+
+servers:
+  - url: https://api.example.com
+    description: API de exemplo (substituir pela real quando existir)
+
+paths:
+  /api/products:
+    get:
+      summary: Lista de produtos
+      description: Devolve uma lista paginada de produtos.
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: Número da página
+        - in: query
+          name: pageSize
+          schema:
+            type: integer
+            default: 12
+          description: Número de produtos por página
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Texto de pesquisa
+      responses:
+        '200':
+          description: Lista de produtos encontrada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+                  total:
+                    type: integer
+        '500':
+          description: Erro interno do servidor
+
+  /api/products/{id}:
+    get:
+      summary: Detalhes de um produto
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Detalhes do produto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          description: Produto não encontrado
+
+  /api/products/{id}/recommendations:
+    get:
+      summary: Recomendações / Bundles para um produto
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Lista de produtos recomendados
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+
+components:
+  schemas:
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 123
+        title:
+          type: string
+          example: "Galo de Barcelos"
+        price:
+          type: number
+          format: float
+          example: 39.9
+        currency:
+          type: string
+          example: "EUR"
+        images:
+          type: array
+          items:
+            type: string
+            format: uri
+        description:
+          type: string
+          example: "Peça artesanal tradicional portuguesa…"
+        specs:
+          type: object
+          additionalProperties: true

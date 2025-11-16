@@ -1,0 +1,6 @@
+packages:
+  - "apps/*"
+  - "prisma"
+
+onlyBuiltDependencies:
+  - cypress
