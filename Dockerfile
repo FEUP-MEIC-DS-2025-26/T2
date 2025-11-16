@@ -3,7 +3,7 @@
 #####################################################
 FROM node:22-alpine AS base
 
-# Instalar pnpm@8 (para ser consistente com o seu ci.yml)
+# Instalar pnpm@8 (para ser consistente com o CI)
 RUN npm install -g pnpm@8
 RUN apk add --no-cache libc6-compat curl
 
@@ -13,19 +13,23 @@ RUN apk add --no-cache libc6-compat curl
 FROM base AS prod-deps
 WORKDIR /app
 ENV PRISMA_SKIP_POSTINSTALL_GENERATE=true
-COPY package.json pnpm-lock.yaml ./
+
+# ficheiros de raiz (monorepo)
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# se quiseres, podes também copiar o package.json da app:
+# COPY apps/mips_product_page/package.json ./apps/mips_product_page/
 
 # Instalar APENAS deps de produção e IGNORAR scripts (como o prisma generate)
 RUN pnpm install --prod --frozen-lockfile --ignore-scripts
 
 #####################################################
-# 3. Builder do web (precisa de TODAS as dependências)
+# 3. Builder (precisa de TODAS as dependências)
 #####################################################
 FROM base AS builder-web
 WORKDIR /app
 
 # Instalar TODAS as dependências (incluindo dev-deps como 'prisma' e 'typescript')
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # Agora copiar o resto do código
@@ -37,7 +41,8 @@ RUN pnpm exec prisma generate
 # Desabilitar telemetry do Next.js
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Build do Next.js
+# Build do Next.js DENTRO de apps/mips_product_page
+WORKDIR /app/apps/mips_product_page
 RUN pnpm run build
 
 #####################################################
@@ -58,9 +63,10 @@ RUN addgroup --system --gid 1001 nodejs \
 COPY --from=prod-deps /app/node_modules ./node_modules
 
 # Copiar os artefactos do BUILD (do stage builder-web)
-COPY --from=builder-web /app/public ./public
-COPY --from=builder-web /app/.next/standalone ./
-COPY --from=builder-web /app/.next/static ./.next/static
+# assumindo que tens `output: 'standalone'` no next.config de mips_product_page
+COPY --from=builder-web /app/apps/mips_product_page/public ./public
+COPY --from=builder-web /app/apps/mips_product_page/.next/standalone ./
+COPY --from=builder-web /app/apps/mips_product_page/.next/static ./.next/static
 
 # Copiar o cliente prisma gerado e o schema
 COPY --from=builder-web /app/node_modules/.prisma ./node_modules/.prisma
