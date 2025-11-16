@@ -42,6 +42,7 @@ model Product {
   created_at    DateTime   @default(now())
   updated_at    DateTime   @updatedAt
   deleted_at    DateTime?
+  brand         String?
 
   created_by_user_id Int
   created_by         User   @relation("CreatedProducts", fields: [created_by_user_id], references: [id])

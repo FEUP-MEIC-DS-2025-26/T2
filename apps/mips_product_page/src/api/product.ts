@@ -61,6 +61,7 @@ app.get('/products/:id', async (req, res) => {
         title: string;
         description: string;
       }[],
+      brand: product.brand ?? null, // <-- Add brand to response
     };
 
     res.json(mapped);

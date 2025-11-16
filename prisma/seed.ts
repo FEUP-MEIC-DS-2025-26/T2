@@ -50,6 +50,7 @@ async function main() {
       { photo_url: '/galo1.png', alt_text: 'Galo de Barcelos1', is_main: false },
       { photo_url: '/galo2.png', alt_text: 'Galo de Barcelos2', is_main: false },
     ],
+    brand: 'BarcelosBarro',
   };
 
   // 3) Criar o produto + fotos relacionadas
@@ -62,6 +63,7 @@ async function main() {
       avg_score: dummyProduct.avg_score,
       specifications: dummyProduct.specifications as any, // campo Json no schema
       created_by_user_id: user.id,
+      brand: dummyProduct.brand, // <-- Seed brand attribute
       photos: {
         create: dummyProduct.photos.map((p) => ({
           photo_url: p.photo_url,
