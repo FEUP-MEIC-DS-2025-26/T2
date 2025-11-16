@@ -1,0 +1,64 @@
+name: Continuous Deployment to Cloud Run
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      PROJECT_ID: mimetic-sunset-478418-d1
+      REGION: europe-west1
+      REPOSITORY: product-repo
+      SERVICE_NAME: t2-app
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 1) Gerar uma versão (timestamp) para tag da imagem
+      - name: Create new version tag
+        run: |
+          VERSION=$(date +'%Y%m%d%H%M%S')
+          echo "IMAGE_VERSION=$VERSION" >> $GITHUB_ENV
+
+      # 2) Autenticar no Google Cloud com a service account
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+      # 3) Build da imagem Docker (ajusta o Dockerfile se for outro)
+      - name: Build Docker image
+        run: |
+          docker build -f Dockerfile \
+            -t $REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$SERVICE_NAME:latest \
+            -t $REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$SERVICE_NAME:${IMAGE_VERSION} \
+            .
+
+      # 4) Login no Artifact Registry
+      - name: Login to Google Artifact Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGION }}-docker.pkg.dev
+          username: _json_key
+          password: ${{ secrets.GCP_CREDENTIALS }}
+
+      # 5) Push das imagens
+      - name: Push Docker images to Artifact Registry
+        run: |
+          docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$SERVICE_NAME:latest
+          docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$SERVICE_NAME:${IMAGE_VERSION}
+
+      # 6) Deploy no Cloud Run com a nova imagem + GOOGLE_API_KEY como env var
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ env.IMAGE_VERSION }}
+          region: ${{ env.REGION }}
+          allow_unauthenticated: true
+          env_vars: |
+            GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}

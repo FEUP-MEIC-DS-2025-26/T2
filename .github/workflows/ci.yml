@@ -1,76 +1,66 @@
-# Nome do seu pipeline
 name: CI Pipeline (Build, Lint, Test, Security)
 
-# Em que eventos este pipeline deve correr
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build-and-test:
-    # Máquina virtual onde o pipeline vai correr
     runs-on: ubuntu-latest
-    
+
+    env:
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+
     steps:
-      # 1. Obter o código do seu repositório
+      # 1. Código
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Configurar o ambiente pnpm e Node.js
+      # 2. pnpm + Node
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 8 # Mude para a sua versão do pnpm, se for diferente
+          version: 8
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18' # Mude para a sua versão do Node.js
-          cache: 'pnpm' # Ativa o cache do 'pnpm' (muito mais rápido)
+          node-version: '22.x'
+          cache: 'pnpm'
 
       # 3. Instalar dependências
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
-      # 4. Correr Linters
-      # (Assume que 'pnpm run lint' está configurado no package.json da raiz)
+      # 4. Lint
       - name: Run Linters
         run: pnpm run lint
 
-      # 5. Correr Testes (Unitários/Integração)
-      # (Assume que 'pnpm run test' está configurado no package.json da raiz)
+      # 5. Testes
       - name: Run Tests
+        env:
+          CI: 'true'
         run: pnpm run test
-      
-      # 6. Scan de Vulnerabilidades (Dependências)
+
+      # 6. Scan de vulnerabilidades
       - name: Run pnpm Audit (Security Scan)
         run: pnpm audit --prod
+        # se quiseres que NÃO falhe o pipeline por warnings:
+        # continue-on-error: true
 
-      # 7. Testar os builds das Imagens Docker
-      # Constrói cada Dockerfile para garantir que não falham.
-      
+      # 7. Build das imagens Docker (para garantir que os Dockerfiles não rebentam)
+
       - name: Build Docker image for mips_host
-        run: |
-          docker build . \
-            -f apps/mips_host/Dockerfile \
-            -t mips-host:latest
+        run: docker build -f apps/mips_host/Dockerfile -t mips-host:latest .
 
       - name: Build Docker image for mips_product_page
-        run: |
-          docker build . \
-            -f apps/mips_product_page/Dockerfile \
-            -t mips-product-page:latest
+        run: docker build -f apps/mips_product_page/Dockerfile -t mips-product-page:latest .
 
       - name: Build Docker image for mips_shopping_cart
-        run: |
-          docker build . \
-            -f apps/mips_shopping_cart/Dockerfile \
-            -t mips-shopping-cart:latest
-            
-      #- name: Build Docker image for web (root Dockerfile)
-      #  run: |
-      #    docker build . \
-      #      -f Dockerfile \
-      #      -t mips-web:latest
+        run: docker build -f apps/mips_shopping_cart/Dockerfile -t mips-shopping-cart:latest .
+
+      # Se quiseres também testar o Dockerfile da raiz:
+      # - name: Build Docker image for web (root Dockerfile)
+      #   run: docker build -f Dockerfile -t mips-web:latest .
