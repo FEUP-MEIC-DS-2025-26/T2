@@ -32,6 +32,9 @@ type ProductFromApi = {
   specifications: ProductSpecification[] | null;
 };
 
+// Product ID to fetch - Galo de Barcelos
+const GALO_PRODUCT_ID = 32614736;
+
 // Helper function to strip HTML tags
 const stripHtmlTags = (html: string): string => {
   const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -42,8 +45,15 @@ const stripHtmlTags = (html: string): string => {
 const calculateAverageRating = (reviews: JumpsellerReview[]): number => {
   if (reviews.length === 0) return 0;
   
-  const sum = reviews.reduce((acc, review) => acc + review.rating, 0);
-  return sum / reviews.length;
+  const validReviews = reviews.filter(review => {
+    const rating = Number(review.rating);
+    return !isNaN(rating) && rating >= 1 && rating <= 5;
+  });
+  
+  if (validReviews.length === 0) return 0;
+  
+  const sum = validReviews.reduce((acc, review) => acc + Number(review.rating), 0);
+  return Math.round((sum / validReviews.length) * 10) / 10;
 };
 
 // Map Jumpseller product to ProductFromApi format
@@ -144,18 +154,20 @@ export default function ProductDetail() {
       setLoading(true);
       setError(null);
       
-      console.log('🔍 Attempting to fetch product from Jumpseller API...');
+      console.log(`🔍 Fetching Galo product (ID: ${GALO_PRODUCT_ID}) from Jumpseller API...`);
       
       try {
         const api = getJumpsellerApi();
         
-        // Fetch product data
-        const jumpsellerProduct = await api.getProductBySKU('GALO-BCL-001');
+        // Fetch product data by ID directly
+        const jumpsellerProduct = await api.getProduct(GALO_PRODUCT_ID);
         
         if (!isMounted) return;
         
+        console.log('✅ Galo product found:', jumpsellerProduct.name);
+        
         // Fetch reviews for the product
-        console.log('🔍 Fetching reviews for product...');
+        console.log(`🔍 Fetching reviews for product ID: ${jumpsellerProduct.id}...`);
         let reviews: JumpsellerReview[] = [];
         try {
           reviews = await api.getProductReviews(jumpsellerProduct.id);
@@ -169,29 +181,33 @@ export default function ProductDetail() {
         const mappedProduct = mapJumpsellerToProduct({ product: jumpsellerProduct }, reviews);
         
         console.log('✅ Product loaded from Jumpseller:', mappedProduct.title);
-        console.log(`   Reviews: ${mappedProduct.reviewCount}, Avg Rating: ${mappedProduct.avg_score.toFixed(2)}`);
+        console.log(`   Reviews: ${mappedProduct.reviewCount}, Avg Rating: ${mappedProduct.avg_score.toFixed(1)}`);
         
         setProduct(mappedProduct);
         setSource('jumpseller');
         setLoading(false);
         
-      } catch (jumpsellerError) {
-        console.warn('⚠️ Jumpseller API failed, falling back to database...', jumpsellerError);
+      } catch (jumpsellerError: any) {
+        console.warn(`⚠️ Jumpseller API failed for product ID ${GALO_PRODUCT_ID}, falling back to database...`, jumpsellerError);
         
         if (!isMounted) return;
         
-        // Fallback to database
+        // Fallback to database - find product by jumpseller_id
         try {
-          console.log('🔍 Attempting to fetch product from database...');
-          const res = await fetch('http://localhost:4000/products/1');
+          console.log(`🔍 Attempting to fetch product from database (Jumpseller ID: ${GALO_PRODUCT_ID})...`);
+          
+          // FIXED: Use correct backend port (3002) and correct endpoint
+          const res = await fetch(`http://localhost:3002/products/jumpseller/${GALO_PRODUCT_ID}`);
           
           if (!isMounted) return;
           
           if (!res.ok) {
-            throw new Error('Erro ao carregar produto da base de dados');
+            const errorData = await res.json().catch(() => ({}));
+            throw new Error(errorData.message || 'Erro ao carregar produto da base de dados');
           }
           
           const dbProduct: ProductFromApi = await res.json();
+          
           console.log('✅ Product loaded from database:', dbProduct.title);
           setProduct(dbProduct);
           setSource('database');
@@ -199,7 +215,7 @@ export default function ProductDetail() {
         } catch (dbError: any) {
           console.error('❌ Database fetch also failed:', dbError);
           if (isMounted) {
-            setError(dbError.message || 'Erro ao carregar produto');
+            setError(dbError.message || `Erro ao carregar produto ${GALO_PRODUCT_ID}`);
           }
         } finally {
           if (isMounted) {
@@ -242,7 +258,7 @@ export default function ProductDetail() {
             fontWeight: 500
           }}
         >
-          A carregar produto...
+          A carregar Galo de Barcelos...
         </Typography>
       </Box>
     );
@@ -268,7 +284,7 @@ export default function ProductDetail() {
           ❌ Erro ao carregar produto
         </Typography>
         <Typography variant="body1" color="error">
-          {error || 'Produto não encontrado.'}
+          {error || `Produto Galo de Barcelos não encontrado.`}
         </Typography>
       </Box>
     );
@@ -299,7 +315,7 @@ export default function ProductDetail() {
               fontWeight: 'bold',
             }}
           >
-            📦 Fonte: {source === 'jumpseller' ? 'Jumpseller API' : 'Base de Dados'}
+            📦 Fonte: {source === 'jumpseller' ? 'Jumpseller API' : 'Base de Dados'} | ID: {GALO_PRODUCT_ID}
           </Typography>
         </Box>
 
@@ -739,8 +755,7 @@ export default function ProductDetail() {
 }
 
 /**
- * ProductSpecifications - Now also tries Jumpseller first, then DB
- * Historia is now included in specifications (no longer separated)
+ * ProductSpecifications - Fetches specs for Galo de Barcelos
  */
 export function ProductSpecifications() {
   const [product, setProduct] = useState<ProductFromApi | null>(null);
@@ -755,15 +770,15 @@ export function ProductSpecifications() {
       
       setLoading(true);
       
-      console.log('🔍 Fetching specs from Jumpseller API...');
+      console.log(`🔍 Fetching specs for Galo (ID: ${GALO_PRODUCT_ID}) from Jumpseller API...`);
       
       try {
         const api = getJumpsellerApi();
-        const jumpsellerProduct = await api.getProductBySKU('GALO-BCL-001');
+        const jumpsellerProduct = await api.getProduct(GALO_PRODUCT_ID);
         
         if (!isMounted) return;
         
-        // Fetch reviews (though we don't use them for specs)
+        // Fetch reviews
         let reviews: JumpsellerReview[] = [];
         try {
           reviews = await api.getProductReviews(jumpsellerProduct.id);
@@ -784,13 +799,14 @@ export function ProductSpecifications() {
         if (!isMounted) return;
         
         try {
-          const res = await fetch('http://localhost:4000/products/1');
+          // FIXED: Use correct backend port (3002)
+          const res = await fetch(`http://localhost:3002/products/jumpseller/${GALO_PRODUCT_ID}`);
           
           if (!isMounted) return;
           
           if (res.ok) {
-            const data: ProductFromApi = await res.json();
-            setProduct(data);
+            const dbProduct: ProductFromApi = await res.json();
+            setProduct(dbProduct);
             setSource('database');
           }
         } catch {
