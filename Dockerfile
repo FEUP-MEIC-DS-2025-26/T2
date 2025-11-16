@@ -21,27 +21,25 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 # Instalar APENAS deps de produção e IGNORAR scripts (como o prisma generate)
 RUN pnpm install --prod --frozen-lockfile --ignore-scripts
-
 #####################################################
-# 3. Builder (precisa de TODAS as dependências)
+# 3. Builder do web (precisa de TODAS as dependências)
 #####################################################
 FROM base AS builder-web
 WORKDIR /app
 
-# Instalar TODAS as dependências (incluindo dev-deps como 'prisma' e 'typescript')
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN pnpm install --frozen-lockfile --ignore-scripts
-
-# Agora copiar o resto do código
+# 1) Copiar TODO o código primeiro (inclui apps/mips_product_page)
 COPY . .
 
-# Correr o prisma generate AGORA, que 'prisma' está instalado
+# 2) Instalar TODAS as dependências (incluindo dev-deps como 'rsbuild', 'prisma', 'typescript', etc.)
+RUN pnpm install --frozen-lockfile --ignore-scripts
+
+# 3) Gerar o Prisma Client
 RUN pnpm exec prisma generate
 
-# Desabilitar telemetry do Next.js
+# 4) Desabilitar telemetry (se for Next ou outra ferramenta que use)
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Build do Next.js DENTRO de apps/mips_product_page
+# 5) Build do mips_product_page (agora com rsbuild instalado)
 WORKDIR /app/apps/mips_product_page
 RUN pnpm run build
 
