@@ -4,9 +4,9 @@ export default createModuleFederationConfig({
   name: "mips_host",
   remotes: {
     mips_product_page_provider:
-      "mips_product_page@http://localhost:3001/mf-manifest.json",
+      "mips_product_page@http://localhost:3101/mf-manifest.json",
     mips_shopping_cart_provider:
-      "mips_shopping_cart@http://localhost:3002/mf-manifest.json",
+      "mips_shopping_cart@http://localhost:3102/mf-manifest.json",
   },
   shareStrategy: "loaded-first",
   shared: {

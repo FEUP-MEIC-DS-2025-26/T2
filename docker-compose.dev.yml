@@ -41,7 +41,7 @@ services:
     environment:
       NODE_ENV: development
     ports:
-      - "3101:3001"
+      - "3001:3001"
     volumes:
       - ./apps/mips_product_page:/app
       - /app/node_modules
