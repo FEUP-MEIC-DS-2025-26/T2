@@ -1,16 +1,23 @@
-# Development Dockerfile
-FROM node:22-alpine AS development
+FROM node:22-alpine
 
 WORKDIR /app
 
-# Install dependencies
-COPY package.json package-lock.json* ./
-RUN npm ci --legacy-peer-deps
+RUN npm install -g pnpm@8 \
+  && apk add --no-cache libc6-compat
 
-# Copy source code
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PRISMA_SKIP_POSTINSTALL_GENERATE=true
+
+# 1) Instalar deps sem correr scripts (postinstall)
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --force --ignore-scripts
+
+# 2) Copiar o resto do código (inclui prisma/)
 COPY . .
+
+# 3) Gerar Prisma Client agora que o schema existe
+RUN pnpm exec prisma generate
 
 EXPOSE 3000
 
-# Start the development server
-CMD ["npm", "run", "dev"]
+CMD ["pnpm", "dev"]

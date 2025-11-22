@@ -1,8 +1,7 @@
-version: '3.8'
 
 services:
   ###################################
-  # NEXT.JS (Main backend/frontend)
+  # NEXT.JS (Production)
   ###################################
   web:
     container_name: next_web
@@ -11,63 +10,14 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgresql://user:password@db:5432/productconfig
-      - REDIS_URL=redis://redis:6379
+      NODE_ENV: production
     depends_on:
       - db
       - redis
     restart: unless-stopped
-    networks:
-      - app-network
-
-  ###################################
-  # MIPS HOST (Module Federation shell)
-  ###################################
-  mips_host:
-    container_name: mips_host
-    build:
-      context: ./apps/mips_host
-      dockerfile: Dockerfile
-    command: pnpm dev
-    ports:
-      - "3100:3000"
-    environment:
-      - NODE_ENV=production
-      - REMOTE_PRODUCT_PAGE_URL=http://mips_product_page:3001/mf-manifest.json
-      - REMOTE_CART_URL=http://mips_shopping_cart:3002/mf-manifest.json
-    networks:
-      - app-network
-    depends_on:
-      - mips_product_page
-      - mips_shopping_cart
-
-  ###################################
-  # MIPS PRODUCT PAGE
-  ###################################
-  mips_product_page:
-    container_name: mips_product_page
-    build:
-      context: ./apps/mips_product_page
-      dockerfile: Dockerfile
-    command: pnpm dev
-    ports:
-      - "3101:3001"
-    networks:
-      - app-network
-
-  ###################################
-  # MIPS SHOPPING CART
-  ###################################
-  mips_shopping_cart:
-    container_name: mips_shopping_cart
-    build:
-      context: ./apps/mips_shopping_cart
-      dockerfile: Dockerfile
-    command: pnpm dev
-    ports:
-      - "3102:3002"
     networks:
       - app-network
 
@@ -77,10 +27,12 @@ services:
   db:
     image: postgres:15-alpine
     container_name: postgres-db
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: productconfig
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:

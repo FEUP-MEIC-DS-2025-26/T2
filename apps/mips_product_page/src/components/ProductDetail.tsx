@@ -199,7 +199,7 @@ export default function ProductDetail() {
           console.log(`🔍 Attempting to fetch product from database (Jumpseller ID: ${GALO_PRODUCT_ID})...`);
           
           // FIXED: Use correct backend port (3002) and correct endpoint
-          const res = await fetch(`http://localhost:3002/products/jumpseller/${GALO_PRODUCT_ID}`);
+          const res = await fetch(`http://localhost:3103/products/jumpseller/${GALO_PRODUCT_ID}`);
           
           if (!isMounted) return;
           
@@ -817,9 +817,9 @@ export function ProductSpecifications() {
         if (!isMounted) return;
         
         try {
-          // FIXED: Use correct backend port (3002)
-          const res = await fetch(`http://localhost:3002/products/jumpseller/${GALO_PRODUCT_ID}`);
-          
+          // FIXED: Use correct backend port (3103)
+          const res = await fetch(`http://localhost:3103/products/jumpseller/${GALO_PRODUCT_ID}`);
+
           if (!isMounted) return;
           
           if (res.ok) {

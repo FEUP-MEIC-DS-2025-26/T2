@@ -1,45 +1,120 @@
-version: '3.8' 
 services:
-  web-dev:
+  ################################################
+  # MIPS HOST (shell principal)
+  ################################################
+  mips_host-dev:
+    container_name: mips_host-dev
+    build:
+      context: ./apps/mips_host
+      dockerfile: Dockerfile
+    command: pnpm dev -- --host 0.0.0.0 --port 3000
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+    ports:
+      - "3100:3000"
+    volumes:
+      - ./apps/mips_host:/app
+      - /app/node_modules
+    depends_on:
+      - mips_product_page-dev
+      - mips_shopping_cart-dev
+      - mips_backend-dev
+      - db
+      - redis
+    networks:
+      - app-network
+
+  ################################################
+  # MIPS PRODUCT PAGE
+  ################################################
+  mips_product_page-dev:
+    container_name: mips_product_page-dev
+    build:
+      context: ./apps/mips_product_page
+      dockerfile: Dockerfile
+      target: dev
+    command: pnpm dev -- --host 0.0.0.0 --port 3001
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+    ports:
+      - "3101:3001"
+    volumes:
+      - ./apps/mips_product_page:/app
+      - /app/node_modules
+    networks:
+      - app-network
+
+  ################################################
+  # MIPS SHOPPING CART
+  ################################################
+  mips_shopping_cart-dev:
+    container_name: mips_shopping_cart-dev
+    build:
+      context: ./apps/mips_shopping_cart
+      dockerfile: Dockerfile
+    command: pnpm dev -- --host 0.0.0.0 --port 3002
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+    ports:
+      - "3102:3002"
+    volumes:
+      - ./apps/mips_shopping_cart:/app
+      - /app/node_modules
+    networks:
+      - app-network
+
+  ################################################
+  # MIPS BACKEND
+  ################################################
+  mips_backend-dev:
+    container_name: mips_backend-dev
     build:
       context: .
-      dockerfile: Dockerfile.dev
-      target: development
-    ports:
-      - "3000:3000"
+      dockerfile: ./apps/mips_backend/Dockerfile
+    env_file:
+      - .env
     environment:
-      - NODE_ENV=development
-      - DATABASE_URL=postgresql://user:password@db:5432/productconfig
-      - REDIS_URL=redis://redis:6379
-    volumes:
-      - .:/app
-      - /app/node_modules
-      - /app/.next
-    restart: unless-stopped
+      NODE_ENV: development
+      PORT: 3003
+    ports:
+      - "3103:3003"
     networks:
       - app-network
     depends_on:
       - db
-      - redis
 
+  ################################################
+  # POSTGRES DEV
+  ################################################
   db:
     image: postgres:15-alpine
-    container_name: postgres-db
+    container_name: postgres-db-dev
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: productconfig
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data_dev:/var/lib/postgresql/data
     ports:
-      - "5433:5432" 
+      - "5433:5432"
     networks:
       - app-network
     restart: unless-stopped
 
+  ################################################
+  # REDIS DEV
+  ################################################
   redis:
     image: redis:7-alpine
-    container_name: redis-cache
+    container_name: redis-cache-dev
     networks:
       - app-network
     restart: unless-stopped
@@ -49,4 +124,4 @@ networks:
     driver: bridge
 
 volumes:
-  postgres_data:
+  postgres_data_dev:
